@@ -69,7 +69,7 @@ jobs:
 
     - name: Compile the udp2raw
       run: |
-        export TERM=xterm-256color
+        export TERM=xterm
         cd openwrt
         sudo make package/openwrt-udp2raw/compile V=s
         sudo make package/luci-app-udp2raw/compile V=s
