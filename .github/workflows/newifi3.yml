@@ -56,19 +56,22 @@ jobs:
     - name: Load udp2raw feeds
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
-        cd openwrt && git clone https://github.com/sensec/luci-app-udp2raw.git package/luci-app-udp2raw
-        cd openwrt && git clone https://github.com/pgolds/openwrt-udp2raw.git package/openwrt-udp2raw
+        echo "$PWD"
+        cd openwrt
+        git clone https://github.com/sensec/luci-app-udp2raw.git package/luci-app-udp2raw
+        git clone https://github.com/pgolds/openwrt-udp2raw.git package/openwrt-udp2raw
 
     - name: Compile the po2lmo
       run: |
-        echo "$PWD"
-        cd openwrt/package/luci-app-udp2raw/tools/po2lmo && sudo make
-        cd openwrt/package/luci-app-udp2raw/tools/po2lmo && sudo make install
+        cd openwrt/package/luci-app-udp2raw/tools/po2lmo
+        sudo make
+        sudo make install
 
     - name: Compile the udp2raw
       run: |
-        cd openwrt && sudo make package/openwrt-udp2raw/compile V=s
-        cd openwrt && sudo make package/luci-app-udp2raw/compile V=s
+        cd openwrt
+        sudo make package/openwrt-udp2raw/compile V=s
+        sudo make package/luci-app-udp2raw/compile V=s
         echo "::set-output name=status::success"
 
     - name: Packages files
