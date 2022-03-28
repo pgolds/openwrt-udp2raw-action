@@ -41,6 +41,7 @@ jobs:
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
         sudo -E apt-get -qq update
         sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-2004)
+        sudo -E apt-get -qq install tar
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
@@ -51,7 +52,7 @@ jobs:
       working-directory: /workdir
       run: |
         df -hT $PWD
-        wget https://downloads.openwrt.org/releases/21.02.2/targets/ramips/mt7621/openwrt-sdk-21.02.2-ramips-mt7621_gcc-8.4.0_musl.Linux-x86_64.tar.xz
+        wget $SDK_URL
         tar --xz -xvf openwrt-sdk-21.02.2-ramips-mt7621_gcc-8.4.0_musl.Linux-x86_64.tar.xz -C openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
