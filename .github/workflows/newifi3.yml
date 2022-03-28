@@ -60,7 +60,8 @@ jobs:
         cd openwrt
         git clone https://github.com/pgolds/openwrt-udp2raw.git package/openwrt-udp2raw
         git clone https://github.com/sensec/luci-app-udp2raw.git package/luci-app-udp2raw
-        make defconfig
+        sudo make defconfig
+        sudo make download -j8
 
     - name: Compile the po2lmo
       run: |
@@ -71,8 +72,8 @@ jobs:
     - name: Compile the udp2raw
       run: |
         cd openwrt
-        sudo make package/openwrt-udp2raw/compile V=s
-        sudo make package/luci-app-udp2raw/compile V=s
+        sudo make package/openwrt-udp2raw/compile V=99
+        sudo make package/luci-app-udp2raw/compile V=99
         echo "::set-output name=status::success"
 
     - name: Packages files
