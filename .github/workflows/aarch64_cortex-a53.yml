@@ -17,6 +17,7 @@ on:
 env:
   SDK_URL: https://archive.openwrt.org/releases/21.02.1/targets/bcm27xx/bcm2710/openwrt-sdk-21.02.1-bcm27xx-bcm2710_gcc-8.4.0_musl.Linux-x86_64.tar.xz
   SDK_NAME: openwrt-sdk-21.02.1-bcm27xx-bcm2710_gcc-8.4.0_musl.Linux-x86_64
+  UDP2RAW_VERSION: aarch64_cortex-a53-20200818
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
 
@@ -79,7 +80,6 @@ jobs:
         cd openwrt/bin/packages/*/base/
         pwd
         echo "IPKPACKAGE=$PWD" >> $GITHUB_ENV
-        echo "::set-output name=release_tag::$(date +"%Y.%m.%d-%H%M")"
         echo "::set-output name=status::success"
 
     - name: Upload Package to release
@@ -88,5 +88,5 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
+        tag_name: ${{ env.UDP2RAW_VERSION }}
         files: ${{ env.IPKPACKAGE }}/*
