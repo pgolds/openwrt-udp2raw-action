@@ -59,6 +59,7 @@ jobs:
         echo "$PWD"
         cd openwrt
         git clone https://github.com/pgolds/openwrt-udp2raw.git package/openwrt-udp2raw
+        make defconfig
 
     - name: Compile the po2lmo
       run: |
