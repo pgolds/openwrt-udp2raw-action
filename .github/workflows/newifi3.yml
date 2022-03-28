@@ -19,6 +19,7 @@ on:
 env:
   REPO_URL: https://github.com/Lienol/openwrt
   REPO_BRANCH: 21.02
+  SDK_URL: https://downloads.openwrt.org/releases/21.02.2/targets/ramips/mt7621/openwrt-sdk-21.02.2-ramips-mt7621_gcc-8.4.0_musl.Linux-x86_64.tar.xz
   FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: newifi3.config
   UPLOAD_RELEASE: true
@@ -50,12 +51,13 @@ jobs:
       working-directory: /workdir
       run: |
         df -hT $PWD
-        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        wget https://downloads.openwrt.org/releases/21.02.2/targets/ramips/mt7621/openwrt-sdk-21.02.2-ramips-mt7621_gcc-8.4.0_musl.Linux-x86_64.tar.xz
+        tar --xz -xvf openwrt-sdk-21.02.2-ramips-mt7621_gcc-8.4.0_musl.Linux-x86_64.tar.xz openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: Load udp2raw feeds
       run: |
-        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
+        # [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         echo "$PWD"
         cd openwrt
         git clone https://github.com/pgolds/openwrt-udp2raw.git package/openwrt-udp2raw
