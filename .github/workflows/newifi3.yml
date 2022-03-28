@@ -52,7 +52,7 @@ jobs:
       run: |
         df -hT $PWD
         wget https://downloads.openwrt.org/releases/21.02.2/targets/ramips/mt7621/openwrt-sdk-21.02.2-ramips-mt7621_gcc-8.4.0_musl.Linux-x86_64.tar.xz
-        tar --xz -xvf openwrt-sdk-21.02.2-ramips-mt7621_gcc-8.4.0_musl.Linux-x86_64.tar.xz openwrt
+        tar --xz -xvf openwrt-sdk-21.02.2-ramips-mt7621_gcc-8.4.0_musl.Linux-x86_64.tar.xz -C openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: Load udp2raw feeds
