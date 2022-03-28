@@ -1,4 +1,4 @@
-name: Newifi3 udp2raw
+name: aarch64_cortex-a72 udp2raw
 
 on:
   repository_dispatch:
@@ -11,17 +11,12 @@ on:
   push:
     branches:
       - master
-    paths:
-      - 'newifi3.config'
   watch:
     types: started
 
 env:
-  REPO_URL: https://github.com/Lienol/openwrt
-  REPO_BRANCH: 21.02
-  SDK_URL: https://downloads.openwrt.org/releases/21.02.2/targets/ramips/mt7621/openwrt-sdk-21.02.2-ramips-mt7621_gcc-8.4.0_musl.Linux-x86_64.tar.xz
-  FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: newifi3.config
+  SDK_URL: https://archive.openwrt.org/releases/21.02.1/targets/bcm27xx/bcm2711/openwrt-sdk-21.02.1-bcm27xx-bcm2711_gcc-8.4.0_musl.Linux-x86_64.tar.xz
+  SDK_NAME: openwrt-sdk-21.02.1-bcm27xx-bcm2711_gcc-8.4.0_musl.Linux-x86_64
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
 
@@ -53,13 +48,12 @@ jobs:
       run: |
         df -hT $PWD
         wget $SDK_URL
-        tar --xz -xvf openwrt-sdk-21.02.2-ramips-mt7621_gcc-8.4.0_musl.Linux-x86_64.tar.xz
-        mv openwrt-sdk-21.02.2-ramips-mt7621_gcc-8.4.0_musl.Linux-x86_64/ openwrt/
+        tar --xz -xvf $SDK_NAME.tar.xz
+        mv $SDK_NAME/ openwrt/
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: Load udp2raw feeds
       run: |
-        # [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         echo "$PWD"
         cd openwrt
         git clone https://github.com/pgolds/openwrt-udp2raw.git package/openwrt-udp2raw

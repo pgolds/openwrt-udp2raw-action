@@ -1,0 +1,92 @@
+name: aarch64_cortex-a53 udp2raw
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+    inputs:
+      ssh:
+        description: 'SSH connection to Actions'
+        required: false
+        default: 'false'  
+  push:
+    branches:
+      - master
+  watch:
+    types: started
+
+env:
+  SDK_URL: https://archive.openwrt.org/releases/21.02.1/targets/bcm27xx/bcm2710/openwrt-sdk-21.02.1-bcm27xx-bcm2710_gcc-8.4.0_musl.Linux-x86_64.tar.xz
+  SDK_NAME: openwrt-sdk-21.02.1-bcm27xx-bcm2710_gcc-8.4.0_musl.Linux-x86_64
+  UPLOAD_RELEASE: true
+  TZ: Asia/Shanghai
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@main
+
+    - name: Initialization environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-2004)
+        sudo -E apt-get -qq install tar
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
+
+    - name: Clone source code
+      working-directory: /workdir
+      run: |
+        df -hT $PWD
+        wget $SDK_URL
+        tar --xz -xvf $SDK_NAME.tar.xz
+        mv $SDK_NAME/ openwrt/
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: Load udp2raw feeds
+      run: |
+        echo "$PWD"
+        cd openwrt
+        git clone https://github.com/pgolds/openwrt-udp2raw.git package/openwrt-udp2raw
+        git clone https://github.com/sensec/luci-app-udp2raw.git package/luci-app-udp2raw
+        sudo make defconfig
+
+    - name: Compile the po2lmo
+      run: |
+        cd openwrt/package/luci-app-udp2raw/tools/po2lmo
+        sudo make
+        sudo make install
+
+    - name: Compile the udp2raw
+      run: |
+        cd openwrt
+        sudo make package/openwrt-udp2raw/compile V=s
+        sudo make package/luci-app-udp2raw/compile V=s
+
+    - name: Generate packages release tag
+      id: tag
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      run: |
+        cd openwrt/bin/packages/*/base/
+        pwd
+        echo "IPKPACKAGE=$PWD" >> $GITHUB_ENV
+        echo "::set-output name=release_tag::$(date +"%Y.%m.%d-%H%M")"
+        echo "::set-output name=status::success"
+
+    - name: Upload Package to release
+      uses: softprops/action-gh-release@v1
+      if: steps.tag.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        files: ${{ env.IPKPACKAGE }}/*
