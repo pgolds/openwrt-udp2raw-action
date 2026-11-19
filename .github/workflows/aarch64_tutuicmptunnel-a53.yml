@@ -74,7 +74,7 @@ jobs:
 
         # 2. 将 kmod 源码中的 kzalloc/kmalloc/kfree 替换为支持大内存和非连续物理页的 kvzalloc/kvmalloc/kvfree
         KMOD_DIR=$(find build_dir/ -type d -path "*/tutuicmptunnel-*/kmod" | head -n 1)
-        gsed -n '70,134p' "$KMOD_DIR/tutu.c"
+        sed -n '70,134p' "$KMOD_DIR/tutu.c"
         sed -i 's/\bkzalloc(/kvzalloc(/g; s/\bkmalloc(/kvmalloc(/g; s/\bkfree(/kvfree(/g' "$KMOD_DIR"/*.c "$KMOD_DIR"/*.h 2>/dev/null || true
 
         # 3. 编译打包
