@@ -54,7 +54,7 @@ jobs:
         git clone https://github.com/hrimfaxi/openwrt-tutuicmptunnel-kmod package/tutuicmptunnel
         ./scripts/feeds update -a
         ./scripts/feeds install libmnl
-        grep -rn "tutuicmptunnel" package/ feeds/ target/ 2>/dev/null | head -n 20
+        echo "CONFIG_PACKAGE_tutuicmptunnel=y" >> .config
         sudo make defconfig
 
     - name: Compile the tutuicmptunnel
