@@ -12,8 +12,8 @@ on:
     types: started
 
 env:
-  SDK_URL: https://archive.openwrt.org/releases/23.05.6/targets/bcm27xx/bcm2710/openwrt-sdk-23.05.6-bcm27xx-bcm2710_gcc-12.3.0_musl.Linux-x86_64.tar.xz
-  SDK_NAME: openwrt-sdk-23.05.6-bcm27xx-bcm2710_gcc-12.3.0_musl.Linux-x86_64
+  SDK_URL: https://downloads.immortalwrt.org/releases/25.12.0/targets/qualcommax/ipq807x/
+  SDK_NAME: ipq807x-immortalwrt-25.12.0
   TT_VERSION: aarch64_cortex-a53-20261119
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
@@ -40,9 +40,11 @@ jobs:
       working-directory: /workdir
       run: |
         df -hT $PWD
-        wget -q $SDK_URL
-        tar --xz -xf $SDK_NAME.tar.xz
-        mv $SDK_NAME openwrt
+        SDK_FILE=$(curl -fsSL "$SDK_URL" | grep -oE 'immortalwrt-sdk-25\.12\.0-qualcommax-ipq807x_[^"]+\.tar\.zst' | head -n 1)
+        echo "Downloading $SDK_FILE..."
+        wget -q "${SDK_URL}${SDK_FILE}"
+        tar --zstd -xf "$SDK_FILE"
+        mv immortalwrt-sdk-25.12.0-qualcommax-ipq807x_* openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: Load and select tutuicmptunnel (代替 make menuconfig)
