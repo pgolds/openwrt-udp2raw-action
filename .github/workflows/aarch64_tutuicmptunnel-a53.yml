@@ -1,0 +1,83 @@
+name: aarch64_cortex-a53 tutuicmptunnel
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+    inputs:
+      ssh:
+        description: 'SSH connection to Actions'
+        required: false
+        default: 'false'  
+  watch:
+    types: started
+
+env:
+  SDK_URL: https://archive.openwrt.org/releases/23.05.6/targets/bcm27xx/bcm2710/openwrt-sdk-23.05.6-bcm27xx-bcm2710_gcc-12.3.0_musl.Linux-x86_64.tar.xz
+  SDK_NAME: openwrt-sdk-23.05.6-bcm27xx-bcm2710_gcc-12.3.0_musl.Linux-x86_64
+  TT_VERSION: aarch64_cortex-a53-20261119
+  UPLOAD_RELEASE: true
+  TZ: Asia/Shanghai
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@main
+
+    - name: Initialization environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install tar
+        sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/nantayo/My-Pkg/master/openwrt) > /dev/null
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
+
+    - name: Clone source code
+      working-directory: /workdir
+      run: |
+        df -hT $PWD
+        wget $SDK_URL
+        tar --xz -xvf $SDK_NAME.tar.xz
+        mv $SDK_NAME/ openwrt/
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: Load tutuicmptunnel feeds
+      run: |
+        echo "$PWD"
+        cd openwrt
+        git clone https://github.com/hrimfaxi/openwrt-tutuicmptunnel-kmod package/tutuicmptunnel
+        grep -rn "tutuicmptunnel" package/ feeds/ target/ 2>/dev/null | head -n 20
+        sudo make defconfig
+
+    - name: Compile the tutuicmptunnel
+      run: |
+        cd openwrt
+        sudo make package/tutuicmptunnel/compile V=s
+        find . -type f \( -name "*tutu*.ipk" -o -name "*tutu*.apk" \)
+
+    - name: Generate packages release tag
+      id: tag
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      run: |
+        cd openwrt/bin/packages/*/base/
+        pwd
+        echo "IPKPACKAGE=$PWD" >> $GITHUB_ENV
+        echo "::set-output name=status::success"
+
+    - name: Upload Package to release
+      uses: softprops/action-gh-release@v1
+      if: steps.tag.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ env.TT_VERSION }}
+        files: ${{ env.IPKPACKAGE }}/*
