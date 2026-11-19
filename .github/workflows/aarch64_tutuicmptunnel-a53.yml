@@ -69,21 +69,27 @@ jobs:
     - name: Compile tutuicmptunnel
       run: |
         cd openwrt
-        # 直接通过 KCFLAGS 放宽 C90 变量声明顺序限制并关闭将警告视为错误
+        # 1. 先解压准备源码
+        make package/tutuicmptunnel/prepare V=s
+
+        # 2. 将 kmod 源码中的 kzalloc/kmalloc/kfree 替换为支持大内存和非连续物理页的 kvzalloc/kvmalloc/kvfree
+        KMOD_DIR=$(find build_dir/ -type d -path "*/tutuicmptunnel-*/kmod" | head -n 1)
+        sed -i 's/\bkzalloc(/kvzalloc(/g; s/\bkmalloc(/kvmalloc(/g; s/\bkfree(/kvfree(/g' "$KMOD_DIR"/*.c "$KMOD_DIR"/*.h 2>/dev/null || true
+
+        # 3. 编译打包
         KCFLAGS="-std=gnu11 -Wno-declaration-after-statement" make package/tutuicmptunnel/compile V=s
 
-        # 收集生成的 ipk/apk
         mkdir -p /workdir/release_files /workdir/apk_extract
         find bin/ -type f \( -name "*tutu*.ipk" -o -name "*tutu*.apk" \) -exec cp -v {} /workdir/release_files/ \;
 
-        # 先进入提取目录，再用 SDK 自带的 host apk 工具直接提取（无需指定 -d 参数）
+        # 4. 使用 SDK 自带的 host apk 工具直接提取
         APK_BIN=$(find /workdir/openwrt/staging_dir/host/ -name "apk" -type f -executable | head -n 1)
         cd /workdir/apk_extract
         for f in /workdir/release_files/*.apk; do
           "$APK_BIN" extract --allow-untrusted "$f"
         done
 
-        # 收集提取出来的内核模块与用户态可执行文件
+        # 5. 收集提取出来的内核模块与用户态可执行文件
         find /workdir/apk_extract -name "*.ko" -exec cp -v {} /workdir/release_files/ \;
         find /workdir/apk_extract -path "*/usr/bin/*" -type f -exec cp -v {} /workdir/release_files/ \;
 
