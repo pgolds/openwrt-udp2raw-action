@@ -74,8 +74,11 @@ jobs:
 
         # 2. 修复高通 NSS 虚拟网卡超大 ifindex 导致 ifset_alloc 申请 64MB 内存失败 (-ENOMEM) 的问题
         KMOD_DIR=$(find build_dir/ -type d -path "*/tutuicmptunnel-*/kmod" | head -n 1)
-        sed -i 's/max_idx = get_max_ifindex_locked();/max_idx = get_max_ifindex_locked(); if (max_idx > 4096) max_idx = 4096;/' "$KMOD_DIR/tutu.c"
+        sed -i -E 's/(max_idx[[:space:]]*=[[:space:]]*get_max_ifindex_locked\(\);)/\1 if (max_idx > 4096) max_idx = 4096;/' "$KMOD_DIR/tutu.c"
 
+        # 打印确认替换已真正写入源码
+        grep -n "get_max_ifindex_locked" "$KMOD_DIR/tutu.c"
+        
         # 3. 编译打包
         KCFLAGS="-std=gnu11 -Wno-declaration-after-statement" make package/tutuicmptunnel/compile V=s
 
