@@ -69,20 +69,37 @@ jobs:
     - name: Compile tutuicmptunnel
       run: |
         cd openwrt
-        # 1. 先解压准备源码
-        make package/tutuicmptunnel/prepare V=s
+        # 1. 在 package/tutuicmptunnel/patches 下创建永久补丁，确保 OpenWrt 构建时 100% 应用且不被覆盖
+        mkdir -p package/tutuicmptunnel/patches
+        cat << 'EOF' > package/tutuicmptunnel/patches/001-fix-nss-ifindex.patch
+        --- a/kmod/tutu.c
+        +++ b/kmod/tutu.c
+        @@ -67,6 +67,8 @@ static struct ifset *ifset_alloc(unsigned int max_ifindex) {
+           size_t        nbits  = (size_t) max_ifindex + 1; /* include index value as bit position */
+           size_t        nlongs = BITS_TO_LONGS(nbits);
+           size_t        size   = sizeof(struct ifset) + nlongs * sizeof(unsigned long);
+        +  pr_info("tutuicmptunnel: patched ifset_alloc max_ifindex=%u size=%zu\n", max_ifindex, size);
+        +  if (size > 65536) size = 65536;
+           struct ifset *w      = kzalloc(size, GFP_KERNEL);
+         
+           if (w) {
+        @@ -87,6 +89,7 @@ static int build_ifset_from_list(struct ifset **out_new) {
+            */
+           rtnl_lock();
+           max_idx = get_max_ifindex_locked();
+        +  if (max_idx > 4096) max_idx = 4096;
+         
+           /* 2. 分配 ifset 结构体 */
+           w = ifset_alloc(max_idx);
+        EOF
 
-        # 2. 打印第 45-75 行确认 ifset_alloc 内部计算逻辑，并强制限制 size 范围
-        KMOD_DIR=$(find build_dir/ -type d -path "*/tutuicmptunnel-*/kmod" | head -n 1)
-        sed -n '45,75p' "$KMOD_DIR/tutu.c"
-        sed -i -E 's/(struct ifset \*w[[:space:]]*=[[:space:]]*)kzalloc\(size,[[:space:]]*GFP_KERNEL\);/if (size > 65536) size = 65536; \1kzalloc(size, GFP_KERNEL);/' "$KMOD_DIR/tutu.c"
-        sed -i -E 's/(max_idx[[:space:]]*=[[:space:]]*get_max_ifindex_locked\(\);)/\1 if (max_idx > 4096) max_idx = 4096;/' "$KMOD_DIR/tutu.c"
-
-        # 确认两处修改均已写入
-        grep -n -E "get_max_ifindex_locked|kzalloc\(size" "$KMOD_DIR/tutu.c"
-        
-        # 3. 编译打包
+        # 2. 清理旧缓存并重新 prepare + compile，确保补丁真正编译进 .ko
+        make package/tutuicmptunnel/clean V=s
         KCFLAGS="-std=gnu11 -Wno-declaration-after-statement" make package/tutuicmptunnel/compile V=s
+
+        # 3. 确认编译产物中已经包含我们的补丁字符串（关键验证！）
+        KO_BUILT=$(find build_dir/ -name "tutuicmptunnel.ko" | head -n 1)
+        strings "$KO_BUILT" | grep "patched ifset_alloc"
 
         mkdir -p /workdir/release_files /workdir/apk_extract
         find bin/ -type f \( -name "*tutu*.ipk" -o -name "*tutu*.apk" \) -exec cp -v {} /workdir/release_files/ \;
