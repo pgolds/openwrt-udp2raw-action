@@ -40,9 +40,7 @@ jobs:
       working-directory: /workdir
       run: |
         df -hT $PWD
-        SDK_FILE=$(curl -fsSL "$SDK_URL" | grep -oE 'immortalwrt-sdk-25\.12\.0-qualcommax-ipq807x_[^"]+\.tar\.zst' | head -n 1)
-        echo "Downloading $SDK_FILE..."
-        wget -q "${SDK_URL}${SDK_FILE}"
+        wget -q "https://downloads.immortalwrt.org/releases/25.12.0/targets/qualcommax/ipq807x/immortalwrt-sdk-25.12.0-qualcommax-ipq807x_gcc-14.3.0_musl.Linux-x86_64.tar.zst"
         tar --zstd -xf "$SDK_FILE"
         mv immortalwrt-sdk-25.12.0-qualcommax-ipq807x_* openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
