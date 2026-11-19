@@ -72,10 +72,9 @@ jobs:
         # 1. 先解压准备源码
         make package/tutuicmptunnel/prepare V=s
 
-        # 2. 将 kmod 源码中的 kzalloc/kmalloc/kfree 替换为支持大内存和非连续物理页的 kvzalloc/kvmalloc/kvfree
+        # 2. 修复高通 NSS 虚拟网卡超大 ifindex 导致 ifset_alloc 申请 64MB 内存失败 (-ENOMEM) 的问题
         KMOD_DIR=$(find build_dir/ -type d -path "*/tutuicmptunnel-*/kmod" | head -n 1)
-        sed -n '70,134p' "$KMOD_DIR/tutu.c"
-        sed -i 's/\bkzalloc(/kvzalloc(/g; s/\bkmalloc(/kvmalloc(/g; s/\bkfree(/kvfree(/g' "$KMOD_DIR"/*.c "$KMOD_DIR"/*.h 2>/dev/null || true
+        sed -i 's/max_idx = get_max_ifindex_locked();/max_idx = get_max_ifindex_locked(); if (max_idx > 4096) max_idx = 4096;/' "$KMOD_DIR/tutu.c"
 
         # 3. 编译打包
         KCFLAGS="-std=gnu11 -Wno-declaration-after-statement" make package/tutuicmptunnel/compile V=s
