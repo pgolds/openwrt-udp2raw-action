@@ -34,7 +34,6 @@ jobs:
         sudo -E apt-get -qq update
         sudo -E apt-get -qq install tar
         sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/nantayo/My-Pkg/master/openwrt) > /dev/null
-        sudo -E apt-get install libmnl
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
@@ -53,6 +52,8 @@ jobs:
         echo "$PWD"
         cd openwrt
         git clone https://github.com/hrimfaxi/openwrt-tutuicmptunnel-kmod package/tutuicmptunnel
+        ./scripts/feeds update -a
+        ./scripts/feeds install libmnl
         grep -rn "tutuicmptunnel" package/ feeds/ target/ 2>/dev/null | head -n 20
         sudo make defconfig
 
