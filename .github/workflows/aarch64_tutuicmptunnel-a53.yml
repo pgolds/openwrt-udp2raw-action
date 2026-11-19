@@ -67,15 +67,8 @@ jobs:
     - name: Compile tutuicmptunnel
       run: |
         cd openwrt
-        # 1. 先执行 prepare 解压并准备 tutuicmptunnel 源码
-        make package/tutuicmptunnel/prepare V=s
-
-        # 2. 在 kmod 的编译文件中追加放宽 C90 变量声明顺序限制的标志
-        KMOD_MK=$(find build_dir/ -path "*/tutuicmptunnel-*/kmod/Makefile" -o -path "*/tutuicmptunnel-*/kmod/Kbuild" | head -n 1)
-        echo "ccflags-y += -std=gnu11 -Wno-declaration-after-statement" >> "$KMOD_MK"
-
-        # 3. 直接编译 tutuicmptunnel（SDK 会自动链接自带的 libmnl）
-        make package/tutuicmptunnel/compile V=s
+        # 直接通过 KCFLAGS 放宽 C90 变量声明顺序限制并关闭将警告视为错误
+        KCFLAGS="-std=gnu11 -Wno-declaration-after-statement" make package/tutuicmptunnel/compile V=s
 
         # 收集生成的 ipk/apk
         mkdir -p /workdir/release_files
