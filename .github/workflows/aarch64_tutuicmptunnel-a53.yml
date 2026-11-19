@@ -73,8 +73,19 @@ jobs:
         KCFLAGS="-std=gnu11 -Wno-declaration-after-statement" make package/tutuicmptunnel/compile V=s
 
         # 收集生成的 ipk/apk
-        mkdir -p /workdir/release_files
+        mkdir -p /workdir/release_files /workdir/apk_extract
         find bin/ -type f \( -name "*tutu*.ipk" -o -name "*tutu*.apk" \) -exec cp -v {} /workdir/release_files/ \;
+
+        # 使用 SDK 自带的 host apk 工具直接提取 apk v3 (ADB) 包内的文件
+        APK_BIN=$(find staging_dir/host/ -name "apk" -type f -executable | head -n 1)
+        for f in /workdir/release_files/*.apk; do
+          "$APK_BIN" extract --allow-untrusted -d /workdir/apk_extract "$f"
+        done
+
+        # 收集提取出来的内核模块与用户态可执行文件
+        find /workdir/apk_extract -name "*.ko" -exec cp -v {} /workdir/release_files/ \;
+        find /workdir/apk_extract -path "*/usr/bin/*" -type f -exec cp -v {} /workdir/release_files/ \;
+        
         ls -lh /workdir/release_files/
 
     - name: Check output files
