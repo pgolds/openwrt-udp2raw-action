@@ -72,12 +72,14 @@ jobs:
         # 1. 先解压准备源码
         make package/tutuicmptunnel/prepare V=s
 
-        # 2. 修复高通 NSS 虚拟网卡超大 ifindex 导致 ifset_alloc 申请 64MB 内存失败 (-ENOMEM) 的问题
+        # 2. 打印第 45-75 行确认 ifset_alloc 内部计算逻辑，并强制限制 size 范围
         KMOD_DIR=$(find build_dir/ -type d -path "*/tutuicmptunnel-*/kmod" | head -n 1)
+        sed -n '45,75p' "$KMOD_DIR/tutu.c"
+        sed -i -E 's/(struct ifset \*w[[:space:]]*=[[:space:]]*)kzalloc\(size,[[:space:]]*GFP_KERNEL\);/if (size > 65536) size = 65536; \1kzalloc(size, GFP_KERNEL);/' "$KMOD_DIR/tutu.c"
         sed -i -E 's/(max_idx[[:space:]]*=[[:space:]]*get_max_ifindex_locked\(\);)/\1 if (max_idx > 4096) max_idx = 4096;/' "$KMOD_DIR/tutu.c"
 
-        # 打印确认替换已真正写入源码
-        grep -n "get_max_ifindex_locked" "$KMOD_DIR/tutu.c"
+        # 确认两处修改均已写入
+        grep -n -E "get_max_ifindex_locked|kzalloc\(size" "$KMOD_DIR/tutu.c"
         
         # 3. 编译打包
         KCFLAGS="-std=gnu11 -Wno-declaration-after-statement" make package/tutuicmptunnel/compile V=s
