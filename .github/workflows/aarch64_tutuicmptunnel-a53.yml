@@ -7,7 +7,7 @@ on:
       ssh:
         description: 'SSH connection to Actions'
         required: false
-        default: 'false'  
+        default: 'false'
   watch:
     types: started
 
@@ -22,17 +22,15 @@ jobs:
   build:
     runs-on: ubuntu-24.04
 
-
     steps:
     - name: Checkout
-      uses: actions/checkout@main
+      uses: actions/checkout@v4
 
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install tar
         sudo -E apt-get -qq install -y $(curl -fsSL https://raw.githubusercontent.com/nantayo/My-Pkg/master/openwrt) > /dev/null
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
@@ -42,41 +40,66 @@ jobs:
       working-directory: /workdir
       run: |
         df -hT $PWD
-        wget $SDK_URL
-        tar --xz -xvf $SDK_NAME.tar.xz
-        mv $SDK_NAME/ openwrt/
+        wget -q $SDK_URL
+        tar --xz -xf $SDK_NAME.tar.xz
+        mv $SDK_NAME openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: Load tutuicmptunnel feeds
+    - name: Load and select tutuicmptunnel (代替 make menuconfig)
       run: |
-        echo "$PWD"
         cd openwrt
         git clone https://github.com/hrimfaxi/openwrt-tutuicmptunnel-kmod package/tutuicmptunnel
         ./scripts/feeds update -a
         ./scripts/feeds install libmnl
-        echo "CONFIG_PACKAGE_tutuicmptunnel=y" >> .config
-        sudo make defconfig
 
-    - name: Compile the tutuicmptunnel
+        # 1. 生成默认 .config 以扫描出所有包配置项
+        make defconfig
+
+        # 2. 动态匹配 tutuicmptunnel 相关的所有 CONFIG_PACKAGE_ 项并设为 =y（自动兼容 kmod-tutuicmptunnel）
+        grep -E "^# CONFIG_PACKAGE_.*tutuicmptunnel is not set" .config | sed 's/# \(CONFIG_PACKAGE_[^ ]*\) is not set/\1=y/' >> .config
+        
+        # 3. 再次运行 defconfig 自动解析并选中依赖（如 libmnl 等）
+        make defconfig
+
+        # 打印确认已选中的配置项
+        grep -i "tutuicmptunnel" .config
+
+    - name: Compile tutuicmptunnel
       run: |
         cd openwrt
-        sudo make package/tutuicmptunnel/compile V=s
-        find . -type f \( -name "*tutu*.ipk" -o -name "*tutu*.apk" \)
+        # 注意：不要使用 sudo 运行 make
+        make package/libs/libmnl/compile -j$(nproc)
+        # 1. 先执行 prepare 解压并准备 tutuicmptunnel 源码
+        make package/tutuicmptunnel/prepare V=s
 
-    - name: Generate packages release tag
+        # 2. 在 kmod 的编译文件中追加放宽 C90 变量声明顺序限制的标志
+        KMOD_MK=$(find build_dir/ -path "*/tutuicmptunnel-*/kmod/Makefile" -o -path "*/tutuicmptunnel-*/kmod/Kbuild" | head -n 1)
+        echo "ccflags-y += -std=gnu11 -Wno-declaration-after-statement" >> "$KMOD_MK"
+
+        # 3. 正式编译打包
+        make package/tutuicmptunnel/compile V=s
+
+        # 收集生成的 ipk/apk 到独立目录，方便 Release 上传
+        mkdir -p /workdir/release_files
+        find bin/ -type f \( -name "*tutu*.ipk" -o -name "*tutu*.apk" \) -exec cp -v {} /workdir/release_files/ \;
+        ls -lh /workdir/release_files/
+
+    - name: Check output files
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        cd openwrt/bin/
-        pwd
-        echo "IPKPACKAGE=$PWD" >> $GITHUB_ENV
-        echo "::set-output name=status::success"
+        if [ -n "$(ls -A /workdir/release_files 2>/dev/null)" ]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+        else
+          echo "No ipk/apk files found!"
+          exit 1
+        fi
 
     - name: Upload Package to release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ env.TT_VERSION }}
-        files: ${{ env.IPKPACKAGE }}/*
+        files: /workdir/release_files/*
