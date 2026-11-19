@@ -76,16 +76,17 @@ jobs:
         mkdir -p /workdir/release_files /workdir/apk_extract
         find bin/ -type f \( -name "*tutu*.ipk" -o -name "*tutu*.apk" \) -exec cp -v {} /workdir/release_files/ \;
 
-        # 使用 SDK 自带的 host apk 工具直接提取 apk v3 (ADB) 包内的文件
-        APK_BIN=$(find staging_dir/host/ -name "apk" -type f -executable | head -n 1)
+        # 先进入提取目录，再用 SDK 自带的 host apk 工具直接提取（无需指定 -d 参数）
+        APK_BIN=$(find /workdir/openwrt/staging_dir/host/ -name "apk" -type f -executable | head -n 1)
+        cd /workdir/apk_extract
         for f in /workdir/release_files/*.apk; do
-          "$APK_BIN" extract --allow-untrusted -d /workdir/apk_extract "$f"
+          "$APK_BIN" extract --allow-untrusted "$f"
         done
 
         # 收集提取出来的内核模块与用户态可执行文件
         find /workdir/apk_extract -name "*.ko" -exec cp -v {} /workdir/release_files/ \;
         find /workdir/apk_extract -path "*/usr/bin/*" -type f -exec cp -v {} /workdir/release_files/ \;
-        
+
         ls -lh /workdir/release_files/
 
     - name: Check output files
