@@ -74,23 +74,15 @@ jobs:
         cat << 'EOF' > package/tutuicmptunnel/patches/001-fix-nss-ifindex.patch
         --- a/kmod/tutu.c
         +++ b/kmod/tutu.c
-        @@ -67,6 +67,8 @@ static struct ifset *ifset_alloc(unsigned int max_ifindex) {
-           size_t        nbits  = (size_t) max_ifindex + 1; /* include index value as bit position */
-           size_t        nlongs = BITS_TO_LONGS(nbits);
-           size_t        size   = sizeof(struct ifset) + nlongs * sizeof(unsigned long);
-        +  pr_info("tutuicmptunnel: patched ifset_alloc max_ifindex=%u size=%zu\n", max_ifindex, size);
-        +  if (size > 65536) size = 65536;
-           struct ifset *w      = kzalloc(size, GFP_KERNEL);
-         
-           if (w) {
-        @@ -87,6 +89,7 @@ static int build_ifset_from_list(struct ifset **out_new) {
+        @@ -88,6 +88,8 @@ static int build_ifset_from_list(struct ifset **out_new) {
             */
-           rtnl_lock();
-           max_idx = get_max_ifindex_locked();
+            rtnl_lock();
+            max_idx = get_max_ifindex_locked();
+        +  pr_info("tutuicmptunnel: raw max_idx=%u\n", max_idx);
         +  if (max_idx > 4096) max_idx = 4096;
-         
-           /* 2. 分配 ifset 结构体 */
-           w = ifset_alloc(max_idx);
+
+            /* 2. 分配 ifset 结构体 */
+            w = ifset_alloc(max_idx);
         EOF
 
         # 2. 清理旧缓存并重新 prepare + compile，确保补丁真正编译进 .ko
