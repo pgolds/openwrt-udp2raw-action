@@ -70,40 +70,53 @@ jobs:
       run: |
         cd openwrt
         # 1. 在 package/tutuicmptunnel/patches 下创建永久补丁，确保 OpenWrt 构建时 100% 应用且不被覆盖
+        rm -rf package/tutuicmptunnel/patches
         mkdir -p package/tutuicmptunnel/patches
-        cat << 'EOF' > package/tutuicmptunnel/patches/001-fix-nss-ifindex.patch
-        --- a/kmod/tutu.c
-        +++ b/kmod/tutu.c
-        @@ -88,6 +88,8 @@ static int build_ifset_from_list(struct ifset **out_new) {
-            */
-            rtnl_lock();
-            max_idx = get_max_ifindex_locked();
-        +  pr_info("tutuicmptunnel: raw max_idx=%u\n", max_idx);
-        +  if (max_idx > 4096) max_idx = 4096;
 
-            /* 2. 分配 ifset 结构体 */
-            w = ifset_alloc(max_idx);
-        EOF
+        # 1. 先让 OpenWrt 解压/准备原始源码到 build_dir
+        make package/tutuicmptunnel/clean V=s
+        make package/tutuicmptunnel/prepare V=s
 
-        # 2. 清理旧缓存并重新 prepare + compile，确保补丁真正编译进 .ko
+        # 2. 定位解压后的 kmod/tutu.c 并复制一份用于生成标准 diff
+        TUTU_C=$(find build_dir/ -path "*/tutuicmptunnel*/kmod/tutu.c" | head -n 1)
+        cp "$TUTU_C" "${TUTU_C}.orig"
+
+        # 3. 使用 python 精确匹配 max_idx = get_max_ifindex_locked(); 并插入上限限制（不依赖行号和空格数量）
+        python3 -c '
+        import sys
+        p = sys.argv[1]
+        with open(p, "r") as f:
+            s = f.read()
+        target = "max_idx = get_max_ifindex_locked();"
+        assert target in s, "Target line not found in tutu.c!"
+        replacement = target + "\n  pr_info(\"tutuicmptunnel: raw max_idx=%u\\n\", max_idx);\n  if (max_idx > 4096) max_idx = 4096;"
+        with open(p, "w") as f:
+            f.write(s.replace(target, replacement, 1))
+        ' "$TUTU_C"
+
+        # 4. 自动生成格式 100% 标准的补丁文件保存到 patches 目录
+        diff -u "${TUTU_C}.orig" "$TUTU_C" | sed "s|${TUTU_C}.orig|a/kmod/tutu.c|g; s|${TUTU_C}|b/kmod/tutu.c|g" > package/tutuicmptunnel/patches/001-fix-nss-ifindex.patch || true
+        cat package/tutuicmptunnel/patches/001-fix-nss-ifindex.patch
+
+        # 5. 清理旧缓存并重新 prepare + compile，确保补丁真正编译进 .ko
         make package/tutuicmptunnel/clean V=s
         KCFLAGS="-std=gnu11 -Wno-declaration-after-statement" make package/tutuicmptunnel/compile V=s
 
-        # 3. 确认编译产物中已经包含我们的补丁字符串（关键验证！）
+        # 6. 确认编译产物中已经包含我们的补丁字符串（关键验证！）
         KO_BUILT=$(find build_dir/ -name "tutuicmptunnel.ko" | head -n 1)
         strings "$KO_BUILT" | grep "patched ifset_alloc"
 
         mkdir -p /workdir/release_files /workdir/apk_extract
         find bin/ -type f \( -name "*tutu*.ipk" -o -name "*tutu*.apk" \) -exec cp -v {} /workdir/release_files/ \;
 
-        # 4. 使用 SDK 自带的 host apk 工具直接提取
+        # 7. 使用 SDK 自带的 host apk 工具直接提取
         APK_BIN=$(find /workdir/openwrt/staging_dir/host/ -name "apk" -type f -executable | head -n 1)
         cd /workdir/apk_extract
         for f in /workdir/release_files/*.apk; do
           "$APK_BIN" extract --allow-untrusted "$f"
         done
 
-        # 5. 收集提取出来的内核模块与用户态可执行文件
+        # 8. 收集提取出来的内核模块与用户态可执行文件
         find /workdir/apk_extract -name "*.ko" -exec cp -v {} /workdir/release_files/ \;
         find /workdir/apk_extract -path "*/usr/bin/*" -type f -exec cp -v {} /workdir/release_files/ \;
 
